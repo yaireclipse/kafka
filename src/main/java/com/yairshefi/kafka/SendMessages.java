@@ -20,9 +20,9 @@ public class SendMessages {
 	public static void main(String[] args) throws InterruptedException, ExecutionException, IOException {
 
 		final String apiKey = checkNotBlank(args[0], "apiKey as 1st");
-		final String apiSecret = checkNotBlank(args[1], "apiSecret as 1st");
-		final String accessTokenStr = checkNotBlank(args[2], "accessToken as 1st");
-		final String accessTokenSecret = checkNotBlank(args[3], "accessTokenSecret as 2nd");
+		final String apiSecret = checkNotBlank(args[1], "apiSecret as 2nd");
+		final String accessTokenStr = checkNotBlank(args[2], "accessToken as 3rd");
+		final String accessTokenSecret = checkNotBlank(args[3], "accessTokenSecret as 4th");
 
 		final OAuth10aService service = new ServiceBuilder()
 				.apiKey(apiKey)
