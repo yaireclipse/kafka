@@ -1,59 +1,41 @@
 package com.yairshefi.kafka;
 
-import java.util.HashMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-
-import javax.net.ssl.SSLContext;
-import javax.ws.rs.client.Client;
-import javax.ws.rs.client.ClientBuilder;
-import javax.ws.rs.client.Invocation;
-import javax.ws.rs.client.WebTarget;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-
+import com.github.scribejava.apis.TwitterApi;
+import com.github.scribejava.core.builder.ServiceBuilder;
+import com.github.scribejava.core.model.*;
+import com.github.scribejava.core.oauth.OAuth10aService;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
-import org.glassfish.jersey.SslConfigurator;
+
+//import javax.ws.rs.core.Response;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Scanner;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 public class SendMessages {
 
-	public static void main(String[] args) throws InterruptedException, ExecutionException {
+	public static void main(String[] args) throws InterruptedException, ExecutionException, IOException {
 
-		final String consumerKey = checkNotBlank(args[0], "consumerKey as 1st");
-		final String nonce = checkNotBlank(args[1], "nonce as 2nd");
-		final String signature = checkNotBlank(args[2], "signature as 3rd");
-		final String token = checkNotBlank(args[3], "token as 4th");
-		final String timestamp = String.valueOf(System.currentTimeMillis() / 1000);
+		final String apiKey = checkNotBlank(args[0], "apiKey as 1st");
+		final String apiSecret = checkNotBlank(args[1], "apiSecret as 1st");
+		final String accessTokenStr = checkNotBlank(args[2], "accessToken as 1st");
+		final String accessTokenSecret = checkNotBlank(args[3], "accessTokenSecret as 2nd");
 
-		SslConfigurator sslConfig = SslConfigurator.newInstance()
-		        .trustStoreFile("cacerts")
-		        .trustStorePassword("changeit")
-		        .keyStoreFile("cacerts")
-		        .keyPassword("changeit");
-		 
-		SSLContext sslContext = sslConfig.createSSLContext();
-		final Client client = ClientBuilder.newBuilder().sslContext(sslContext).build();
-		
-		final WebTarget target = client.target("https://api.twitter.com/1.1").path("followers/ids.json");
+		final OAuth10aService service = new ServiceBuilder()
+				.apiKey(apiKey)
+				.apiSecret(apiSecret)
+				.build(TwitterApi.instance());
+		final Scanner in = new Scanner(System.in);
 
-		final Invocation.Builder invocationBuilder =
-		        target.request(MediaType.TEXT_PLAIN_TYPE);
-		invocationBuilder.header("Authorization",
-						"OAuth oauth_consumer_key=\"" + consumerKey + "\", " +
-						"oauth_nonce=\"" + nonce + "\", " +
-						"oauth_signature=\"" + signature + "\", " +
-						"oauth_signature_method=\"HMAC-SHA1\", " +
-						"oauth_timestamp=\"" + timestamp + "\", " +
-						"oauth_token=\"" + token + "\", " +
-						"oauth_version=\"1.0\"");
-		
-		Response response = invocationBuilder.get();
-		System.out.println(response.getStatus());
-		String entStr = response.readEntity(String.class);
-		System.out.println(entStr);
-		
+		OAuth1AccessToken accessToken = new OAuth1AccessToken(accessTokenStr, accessTokenSecret);
+		final OAuthRequest request = new OAuthRequest(Verb.GET, "https://api.twitter.com/1.1/followers/ids.json");
+		service.signRequest(accessToken, request);
+		final Response response = service.execute(request);
+		System.out.println("response: " + response.getBody());
+
 		final HashMap<String, Object> configs = new HashMap<>();
 		configs.put("bootstrap.servers", "localhost:9092");
 		configs.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
@@ -63,7 +45,7 @@ public class SendMessages {
 		try (final KafkaProducer<String, String> kafkaProducer =
 				     new KafkaProducer<>(configs) ) {
 		
-			final ProducerRecord<String, String> record = new ProducerRecord<>("twitter_followers", entStr);
+			final ProducerRecord<String, String> record = new ProducerRecord<>("twitter_followers", response.getBody());
 			final Future<RecordMetadata> sendFuture = kafkaProducer.send(record);
 			
 			final RecordMetadata recordMetadata = sendFuture.get();
